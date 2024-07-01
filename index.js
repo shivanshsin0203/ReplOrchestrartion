@@ -47,8 +47,31 @@ const findAvailablePorts = async () => {
     }
     throw new Error('No available ports');
 };
+app.post('/stopcontainer', async (req, res) => {
+  console.log(req.body.docId)
+  const  containerId  = req.body.docId;
 
-// Routes for database action
+  if (!containerId) {
+    return res.status(400).json({ error: 'Container ID is required' });
+  }
+
+  try {
+    const container = docker.getContainer(containerId);
+
+    await container.stop();
+    console.log(`Container ${containerId} stopped successfully.`);
+
+    await container.remove();
+    console.log(`Container ${containerId} removed successfully.`);
+
+    res.json({ message: `Container ${containerId} stopped and removed successfully.` });
+  } catch (err) {
+    console.error(`Error stopping or removing container ${containerId}:`, err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// New container creation
 app.post("/startproject", async (req, res) => {
     console.log(req.body);
     const id = req.body.projectId;
@@ -70,11 +93,13 @@ app.post("/startproject", async (req, res) => {
             const container = await docker.createContainer({
                 Image: 'repl1',
                 ExposedPorts: {
+                    
                     '3002/tcp': {},
                     '8000/tcp': {}
                 },
                 HostConfig: {
                     PortBindings: {
+                        
                         '3002/tcp': [{ HostPort: port3002.toString() }],
                         '8000/tcp': [{ HostPort: port8000.toString() }]
                     }
