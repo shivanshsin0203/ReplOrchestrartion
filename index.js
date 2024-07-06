@@ -122,7 +122,45 @@ app.post("/startproject", async (req, res) => {
             console.error('Error starting Docker container:', error);
             res.status(500).json({ message: "Error starting project" });
         }
-    } else {
+    }
+    else if (framework === 'React.js') {
+      try {
+          const { port3002, port8000 } = await findAvailablePorts();
+
+          const container = await docker.createContainer({
+              Image: 'repl2',
+              ExposedPorts: {
+                  
+                  '3002/tcp': {},
+                  '5173/tcp': {}
+              },
+              HostConfig: {
+                  PortBindings: {
+                      
+                      '3002/tcp': [{ HostPort: port3002.toString() }],
+                      '5173/tcp': [{ HostPort: port8000.toString() }]
+                  }
+              }
+          });
+
+          await container.start();
+
+          const dockerId = container.id;
+
+          portToDockerIdMap.push({ port3002, port8000, dockerId });
+          dockerIdToPortMap.push({ dockerId, port3002, port8000 });
+
+          res.json({ 
+              message: "Project started successfully", 
+              dockerId,
+              ports: { port3002, port8000 }
+          });
+      } catch (error) {
+          console.error('Error starting Docker container:', error);
+          res.status(500).json({ message: "Error starting project" });
+      }
+  } 
+    else {
         res.json({ message: "Project started successfully" });
     }
 });
