@@ -22,6 +22,9 @@ const databaseConnect = async () => {
 const userSchema = new mongoose.Schema({
     email: String,
     projectId: String,
+    framework: String,
+    isActive: Boolean,
+    lastModified: { type: Date, default: Date.now }
 });
 
 const User = mongoose.model("user", userSchema);
@@ -71,27 +74,33 @@ app.post('/stopcontainer', async (req, res) => {
   }
 });
 
+app.post('/getprojects', async (req, res) => {
+    const email = req.body.email;
+    const projects = await User.find({ email: email });
+    res.json(projects);
+});
+
 // New container creation
 app.post("/startproject", async (req, res) => {
     console.log(req.body);
     const id = req.body.projectId;
     const email = req.body.email;
     const framework = req.body.framework;
-
-    const isProject = await User.findOne({ email: email, projectId: id });
-    if (isProject) {
-        res.json({ message: "Project already started" });
-        return;
-    }
-
-    await User.create({ email: email, projectId: id });
-
+    if(! await User.findOne({ email: email, projectId: id })) {
+    await User.create({ email: email, projectId: id,framework: framework, isActive: false,lastModified: Date.now()});}
+    const envVars = [
+        `mongoUrl=${process.env.mongoUrl}`,
+        `AWS_ACCESS_KEY_ID=${process.env.AWS_ACCESS_KEY_ID}`,
+        `AWS_SECRET_ACCESS_KEY=${process.env.AWS_SECRET_ACCESS_KEY}`,
+        `AWS_REGION=${process.env.AWS_REGION}`,
+        `S3_BUCKET_NAME=${process.env.S3_BUCKET_NAME}`
+    ];
     if (framework === 'Node.js') {
         try {
             const { port3002, port8000 } = await findAvailablePorts();
 
             const container = await docker.createContainer({
-                Image: 'repl1',
+                Image: 'replnodeinitial',
                 ExposedPorts: {
                     
                     '3002/tcp': {},
@@ -103,7 +112,8 @@ app.post("/startproject", async (req, res) => {
                         '3002/tcp': [{ HostPort: port3002.toString() }],
                         '8000/tcp': [{ HostPort: port8000.toString() }]
                     }
-                }
+                },
+                Env: envVars
             });
 
             await container.start();
@@ -128,7 +138,7 @@ app.post("/startproject", async (req, res) => {
           const { port3002, port8000 } = await findAvailablePorts();
 
           const container = await docker.createContainer({
-              Image: 'repl2',
+              Image: 'replreactinitial',
               ExposedPorts: {
                   
                   '3002/tcp': {},
@@ -140,7 +150,8 @@ app.post("/startproject", async (req, res) => {
                       '3002/tcp': [{ HostPort: port3002.toString() }],
                       '5173/tcp': [{ HostPort: port8000.toString() }]
                   }
-              }
+              },
+              Env: envVars
           });
 
           await container.start();
